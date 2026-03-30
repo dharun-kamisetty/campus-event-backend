@@ -54,3 +54,55 @@ async def google_login(
         "token_type": "bearer",
         "user": user
     }
+
+
+class CreateAdminRequest(BaseModel):
+    email: str
+    name: str
+
+
+@router.post("/create-admin", response_model=TokenResponse)
+async def create_admin(
+    request: CreateAdminRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Create an admin user. Only one admin can exist for security.
+    Call this once to set up the initial admin account.
+    """
+    import os
+    admin_secret = os.getenv("ADMIN_SECRET", "")
+    
+    # Check if admin already exists
+    existing_admin = db.query(User).filter(User.role == "admin").first()
+    
+    if existing_admin:
+        # Update existing admin's email to new one
+        existing_admin.email = request.email
+        existing_admin.name = request.name
+        db.commit()
+        db.refresh(existing_admin)
+        access_token = create_access_token(data={"sub": existing_admin.email})
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": existing_admin
+        }
+    
+    # Create new admin
+    admin_user = User(
+        email=request.email,
+        name=request.name,
+        role="admin"
+    )
+    db.add(admin_user)
+    db.commit()
+    db.refresh(admin_user)
+    
+    access_token = create_access_token(data={"sub": admin_user.email})
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": admin_user
+    }
