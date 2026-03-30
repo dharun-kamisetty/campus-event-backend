@@ -6,12 +6,14 @@ from backend.schemas import UserResponse
 from backend.auth.google_auth import verify_google_token
 from backend.auth.jwt_utils import create_access_token
 from pydantic import BaseModel
+from typing import Optional
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 class GoogleTokenRequest(BaseModel):
     token: str
+    role: Optional[str] = "student"
 
 
 class TokenResponse(BaseModel):
@@ -28,6 +30,7 @@ async def google_login(
     """
     Google OAuth login endpoint.
     Verifies Google token, creates/updates user, returns JWT.
+    For testing: role can be passed to set user role (admin, faculty, club, student)
     """
     # Verify Google token and get user info
     user_info = await verify_google_token(token_request.token)
@@ -36,11 +39,11 @@ async def google_login(
     user = db.query(User).filter(User.email == user_info["email"]).first()
     
     if not user:
-        # Create new user with default role
+        # Create new user - use provided role or default to student
         user = User(
             email=user_info["email"],
             name=user_info["name"],
-            role="student"  # Default role
+            role=token_request.role or "student"
         )
         db.add(user)
         db.commit()
