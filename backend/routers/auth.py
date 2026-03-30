@@ -70,26 +70,23 @@ async def create_admin(
     db: Session = Depends(get_db)
 ):
     """
-    Create an admin user. Only one admin can exist for security.
-    Call this once to set up the initial admin account.
+    Create or update an admin user.
+    Call this to set up the admin account.
     """
-    import os
-    admin_secret = os.getenv("ADMIN_SECRET", "")
+    # Check if user with this email already exists
+    existing_user = db.query(User).filter(User.email == request.email).first()
     
-    # Check if admin already exists
-    existing_admin = db.query(User).filter(User.role == "admin").first()
-    
-    if existing_admin:
-        # Update existing admin's email to new one
-        existing_admin.email = request.email
-        existing_admin.name = request.name
+    if existing_user:
+        # Update existing user to admin
+        existing_user.role = "admin"
+        existing_user.name = request.name
         db.commit()
-        db.refresh(existing_admin)
-        access_token = create_access_token(data={"sub": existing_admin.email})
+        db.refresh(existing_user)
+        access_token = create_access_token(data={"sub": existing_user.email})
         return {
             "access_token": access_token,
             "token_type": "bearer",
-            "user": existing_admin
+            "user": existing_user
         }
     
     # Create new admin
